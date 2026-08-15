@@ -1,3 +1,5 @@
-FinMind
 pandas
-sqlite3
+FinMind
+yfinance
+plotly
+streamlit
