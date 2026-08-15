@@ -10,7 +10,7 @@ def visualize_stock(stock_id):
     
     # 1. 取得股價資料
     df_price = pd.read_sql_query('''
-        SELECT date, close_price 
+        SELECT date, adj_close_price as close_price 
         FROM daily_prices 
         WHERE stock_id = ? 
         ORDER BY date ASC

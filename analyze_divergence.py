@@ -9,7 +9,7 @@ def get_closest_trading_price(cursor, stock_id, target_date):
     (因為財報公佈日可能是假日，所以往後找最近的開盤日)
     """
     cursor.execute('''
-        SELECT date, close_price 
+        SELECT date, adj_close_price as close_price 
         FROM daily_prices 
         WHERE stock_id = ? AND date >= ? 
         ORDER BY date ASC 

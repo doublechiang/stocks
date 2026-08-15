@@ -2,34 +2,20 @@ import sqlite3
 import pandas as pd
 from FinMind.data import DataLoader
 from datetime import datetime, timedelta
+import yfinance as yf
 import time
 
 DB_PATH = 'stock_data.db'
-# 只抓取台灣前三大權值股做測試
-STOCKS = ['2330', '2317', '2454','6412']
+STOCKS = ['2330', '2317', '2454']
 START_DATE = '2020-01-01'
 
 def estimate_announcement_date(period_end_str):
-    """
-    推估財報公佈日 (避免未來函數)：
-    台灣規定財報公佈期限大約如下：
-    Q1 (03-31結束) -> 05-15前
-    Q2 (06-30結束) -> 08-14前
-    Q3 (09-30結束) -> 11-14前
-    Q4 (12-31結束) -> 隔年 03-31前
-    """
     dt = pd.to_datetime(period_end_str)
-    if dt.month == 3:
-        return f"{dt.year}-05-15"
-    elif dt.month == 6:
-        return f"{dt.year}-08-14"
-    elif dt.month == 9:
-        return f"{dt.year}-11-14"
-    elif dt.month == 12:
-        return f"{dt.year + 1}-03-31"
-    else:
-        # 例外狀況往後推45天
-        return (dt + timedelta(days=45)).strftime('%Y-%m-%d')
+    if dt.month == 3: return f"{dt.year}-05-15"
+    elif dt.month == 6: return f"{dt.year}-08-14"
+    elif dt.month == 9: return f"{dt.year}-11-14"
+    elif dt.month == 12: return f"{dt.year + 1}-03-31"
+    else: return (dt + timedelta(days=45)).strftime('%Y-%m-%d')
 
 def fetch_and_save_data():
     api = DataLoader()
@@ -39,8 +25,8 @@ def fetch_and_save_data():
     for stock_id in STOCKS:
         print(f"\n--- 正在處理 {stock_id} ---")
         
-        # 1. 抓取 EPS (來自綜合損益表)
-        print(f"抓取 {stock_id} 歷史財報...")
+        # 1. 抓取 EPS (FinMind)
+        print(f"抓取 {stock_id} 歷史財報 (FinMind)...")
         try:
             fs_df = api.taiwan_stock_financial_statement(stock_id=stock_id, start_date=START_DATE)
             eps_df = fs_df[fs_df['type'] == 'EPS'].copy()
@@ -58,24 +44,30 @@ def fetch_and_save_data():
                 ''', (stock_id, year, quarter, row['value'], announce_date))
                 eps_count += 1
             print(f"成功存入 {eps_count} 筆 EPS 資料。")
-            
         except Exception as e:
             print(f"抓取 {stock_id} EPS 失敗: {e}")
             
-        time.sleep(1) # 暫停1秒，避免呼叫太快被鎖
+        time.sleep(1)
         
-        # 2. 抓取每日股價
-        print(f"抓取 {stock_id} 歷史股價...")
+        # 2. 抓取每日股價含還原股價 (yfinance)
+        print(f"抓取 {stock_id} 歷史股價 (yfinance)...")
         try:
-            price_df = api.taiwan_stock_daily(stock_id=stock_id, start_date=START_DATE)
+            # 加上 .TW 代表台灣上市股票
+            yf_ticker = f"{stock_id}.TW"
+            ticker = yf.Ticker(yf_ticker)
+            # auto_adjust=False 才會同時回傳 Close 與 Adj Close
+            price_df = ticker.history(start=START_DATE, auto_adjust=False)
+            
             price_count = 0
-            for _, row in price_df.iterrows():
+            for date_idx, row in price_df.iterrows():
+                date_str = date_idx.strftime('%Y-%m-%d')
+                
                 cursor.execute('''
-                    INSERT OR REPLACE INTO daily_prices (stock_id, date, close_price, volume)
-                    VALUES (?, ?, ?, ?)
-                ''', (stock_id, row['date'], row['close'], row['Trading_Volume']))
+                    INSERT OR REPLACE INTO daily_prices (stock_id, date, close_price, volume, adj_close_price)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (stock_id, date_str, float(row['Close']), int(row['Volume']), float(row['Adj Close'])))
                 price_count += 1
-            print(f"成功存入 {price_count} 筆股價資料。")
+            print(f"成功存入 {price_count} 筆含還原股價的歷史資料。")
             
         except Exception as e:
             print(f"抓取 {stock_id} 股價失敗: {e}")
@@ -84,7 +76,7 @@ def fetch_and_save_data():
         
     conn.commit()
     conn.close()
-    print("\n所有測試資料抓取與寫入完成！")
+    print("\n所有混血版資料抓取與寫入完成！")
 
 if __name__ == '__main__':
     fetch_and_save_data()
