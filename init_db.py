@@ -47,6 +47,7 @@ def create_tables():
             date DATE NOT NULL,
             close_price REAL NOT NULL,
             volume INTEGER,
+            adj_close_price REAL,
             FOREIGN KEY (stock_id) REFERENCES stock_info (stock_id),
             UNIQUE (stock_id, date)
         )
