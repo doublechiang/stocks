@@ -44,10 +44,15 @@ def fetch_data_for_stock(stock_id):
                     VALUES (?, ?, ?, ?, ?)
                 ''', (stock_id, year, quarter, row['value'], announce_date))
                 
-        # 2. 抓取股價
-        yf_ticker = f"{stock_id}.TW"
-        ticker = yf.Ticker(yf_ticker)
-        price_df = ticker.history(start=START_DATE, auto_adjust=False)
+        # 2. 抓取股價 (上市用 .TW, 上櫃用 .TWO)
+        price_df = pd.DataFrame()
+        for suffix in ['.TW', '.TWO']:
+            yf_ticker = f"{stock_id}{suffix}"
+            ticker = yf.Ticker(yf_ticker)
+            price_df = ticker.history(start=START_DATE, auto_adjust=False)
+            if not price_df.empty:
+                break
+
         if not price_df.empty:
             for date_idx, row in price_df.iterrows():
                 date_str = date_idx.strftime('%Y-%m-%d')
