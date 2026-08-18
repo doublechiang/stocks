@@ -163,3 +163,13 @@ if analyze_btn:
             st.success("圖表載入完成！您可以拖曳放大縮小，或將滑鼠游標停留在圖表上查看詳細數據。")
         else:
             st.warning("該股票的歷史資料不足，無法計算背離（通常是因為上市時間太短）。")
+
+# Footer
+st.divider()
+st.markdown(
+    "<div style='text-align: center; color: gray; font-size: 0.85em;'>"
+    "🐛 Report a bug | 💡 Suggest a feature → "
+    "<a href='https://github.com/doublechiang/stocks/issues' target='_blank'>"
+    "github.com/doublechiang/stocks/issues</a></div>",
+    unsafe_allow_html=True,
+)
