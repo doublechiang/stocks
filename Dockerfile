@@ -21,4 +21,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Run Streamlit listening on 0.0.0.0 and $PORT
-CMD streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false
+CMD streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false --server.enableWebsocketCompression=false --server.headless=true --browser.gatherUsageStats=false
