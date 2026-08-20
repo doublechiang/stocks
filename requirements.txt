@@ -2,4 +2,5 @@ pandas
 FinMind
 yfinance
 plotly
-streamlit
+flask
+gunicorn

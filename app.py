@@ -1,4 +1,3 @@
-import streamlit as st
 import sqlite3
 import pandas as pd
 import plotly.graph_objects as go
@@ -6,11 +5,13 @@ from plotly.subplots import make_subplots
 from FinMind.data import DataLoader
 from datetime import timedelta
 import yfinance as yf
-import time
+from flask import Flask, render_template, request
 import init_db
 
 # 確保資料庫與資料表已初始化
 init_db.create_tables()
+
+app = Flask(__name__)
 
 DB_PATH = 'stock_data.db'
 START_DATE = '2020-01-01'
@@ -65,7 +66,7 @@ def fetch_data_for_stock(stock_id):
             success = False
             
     except Exception as e:
-        st.error(f"下載失敗: {e}")
+        print(f"下載失敗: {e}")
         success = False
         
     conn.commit()
@@ -134,47 +135,49 @@ def plot_divergence(stock_id):
     )
     return fig
 
-# Streamlit UI
-st.set_page_config(page_title="台股背離分析系統", layout="wide", page_icon="📈")
-st.title("📈 台股 EPS 與股價背離掃描器")
-st.markdown("輸入任何台灣上市櫃股票代號，系統將自動為您繪製 **還原股價** 與 **近四季EPS (TTM)** 的背離分析圖。")
 
-col1, col2 = st.columns([1, 4])
-with col1:
-    stock_input = st.text_input("🔍 請輸入股票代號 (例如: 2330)", "2330")
-    analyze_btn = st.button("產生分析圖表", type="primary", use_container_width=True)
+@app.route('/')
+def index():
+    """首頁：顯示搜尋表單"""
+    return render_template('index.html')
 
-if analyze_btn:
-    with st.spinner(f"正在分析 {stock_input} ..."):
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM daily_prices WHERE stock_id = ?", (stock_input,))
-        count = cursor.fetchone()[0]
-        conn.close()
-        
-        # 如果資料庫內沒資料或資料太少，觸發即時下載
-        if count < 100:
-            info_msg = st.empty()
-            info_msg.info(f"資料庫尚未建立 {stock_input} 的完整資料，正在即時從雲端獲取中，請稍候約 5~10 秒...")
-            success = fetch_data_for_stock(stock_input)
-            info_msg.empty()  # 下載完成後清除訊息
-            if not success:
-                st.error(f"找不到代號 {stock_input} 的資料，請確認是否為有效代碼。")
-                st.stop()
-                
-        fig = plot_divergence(stock_input)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True)
-            st.success("圖表載入完成！您可以拖曳放大縮小，或將滑鼠游標停留在圖表上查看詳細數據。")
-        else:
-            st.warning("該股票的歷史資料不足，無法計算背離（通常是因為上市時間太短）。")
 
-# Footer
-st.divider()
-st.markdown(
-    "<div style='text-align: center; color: gray; font-size: 0.85em;'>"
-    "🐛 Report a bug | 💡 Suggest a feature → "
-    "<a href='https://github.com/doublechiang/stocks/issues' target='_blank'>"
-    "github.com/doublechiang/stocks/issues</a></div>",
-    unsafe_allow_html=True,
-)
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    """分析路由：接收股票代號，回傳含圖表的頁面"""
+    stock_id = request.form.get('stock_id', '').strip()
+    
+    if not stock_id:
+        return render_template('index.html', error="請輸入股票代號。", error_type="warning")
+    
+    # 檢查資料庫是否有足夠資料，沒有就即時下載
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM daily_prices WHERE stock_id = ?", (stock_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    
+    if count < 100:
+        success = fetch_data_for_stock(stock_id)
+        if not success:
+            return render_template('index.html',
+                                   stock_id=stock_id,
+                                   error=f"找不到代號 {stock_id} 的資料，請確認是否為有效代碼。",
+                                   error_type="danger")
+    
+    fig = plot_divergence(stock_id)
+    if fig:
+        # 將 Plotly 圖表轉成 HTML 片段嵌入模板
+        chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return render_template('index.html', stock_id=stock_id, chart_html=chart_html)
+    else:
+        return render_template('index.html',
+                               stock_id=stock_id,
+                               error="該股票的歷史資料不足，無法計算背離（通常是因為上市時間太短）。",
+                               error_type="warning")
+
+
+if __name__ == '__main__':
+    import os
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=True)

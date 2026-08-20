@@ -20,5 +20,5 @@ RUN python init_db.py
 ENV PORT=8080
 EXPOSE 8080
 
-# Run Streamlit listening on 0.0.0.0 and $PORT
-CMD streamlit run app.py --server.port=${PORT} --server.address=0.0.0.0 --server.enableCORS=true --server.enableXsrfProtection=false --server.enableWebsocketCompression=false --server.headless=true --browser.gatherUsageStats=false
+# Run Flask with gunicorn (production WSGI server, no WebSocket needed)
+CMD exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --threads 4 --timeout 120 app:app

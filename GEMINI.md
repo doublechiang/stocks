@@ -1,7 +1,7 @@
 # Stock Analysis App — Project Context
 
 ## Overview
-Taiwan stock EPS divergence analysis app. Built with **Streamlit**, deployed on **Google Cloud Run** via GitHub Actions CI/CD.
+Taiwan stock EPS divergence analysis app. Built with **Flask**, deployed on **Google Cloud Run** via GitHub Actions CI/CD.
 
 - **Repo**: https://github.com/doublechiang/stocks.git
 - **Cloud Run service**: `stock-app` in project `stock-app-tw-061683`, region `asia-east1`
@@ -10,19 +10,19 @@ Taiwan stock EPS divergence analysis app. Built with **Streamlit**, deployed on 
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `app.py` | Main Streamlit app (stock charts, EPS data) |
-| `Dockerfile` | Container image with Streamlit flags in CMD |
-| `.streamlit/config.toml` | Streamlit server settings |
+| `app.py` | Main Flask app (routes, stock charts, EPS data) |
+| `templates/index.html` | Jinja2 template (UI with Bootstrap + Plotly charts) |
+| `Dockerfile` | Container image with gunicorn CMD |
 | `.github/workflows/deploy.yml` | CI/CD pipeline (push to main → deploy to Cloud Run) |
 | `init_db.py` | SQLite database initialization |
 
-## Streamlit on Cloud Run — Critical Deployment Rules
-When modifying Streamlit server settings for Cloud Run deployment, always ensure:
+## Flask on Cloud Run — Deployment Notes
+This app uses Flask + gunicorn (pure HTTP, no WebSocket). Deployment is straightforward:
 
-1. **`enableCORS = true`** — Setting this to `false` causes Streamlit's Tornado WebSocket handler to reject connections with a 403 (origin mismatch between browser URL and internal bind address).
-2. **`enableWebsocketCompression = false`** — Cloud Run's load balancer does not support WebSocket compression (`permessage-deflate`).
-3. **`--session-affinity`** must be set in Cloud Run deploy flags — Streamlit is stateful and requires the same container instance for both HTTP and WebSocket.
-4. **Do NOT enable HTTP/2** on Cloud Run — WebSocket requires HTTP/1.1 Upgrade mechanism.
+1. **gunicorn** serves the Flask app with `--workers 2 --threads 4`
+2. **No session affinity needed** — Flask is stateless, each request is independent
+3. **No WebSocket complications** — no CORS, compression, or HTTP/2 issues
+4. Charts are rendered server-side using Plotly's `to_html()` and embedded in the response
 
 ## User Preferences
 - Communicate in **Traditional Chinese (繁體中文)**
